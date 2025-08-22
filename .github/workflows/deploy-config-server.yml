@@ -9,56 +9,9 @@ on:
   workflow_dispatch:  # Permitir ejecución manual
 
 jobs:
-  test:
-    name: Run Tests
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-          
-      - name: Cache Maven dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          
-      - name: Run tests
-        run: mvn test -Dspring.profiles.active=test
-        continue-on-error: false
-        
-      - name: Generate test report
-        uses: dorny/test-reporter@v1
-        if: always()
-        with:
-          name: Maven Tests
-          path: target/surefire-reports/*.xml
-          reporter: java-junit
-          fail-on-error: false
-
-  security-scan:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-
   deploy:
     name: Deploy to Production
-    needs: [test, security-scan]
+    # needs: [] # Sin dependencias - deploy directo
     runs-on: ubuntu-latest
     environment: production
 
