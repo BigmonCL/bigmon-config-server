@@ -9,13 +9,12 @@ spring:
     config:
       server:
         git:
-          uri: ${GIT_REPO_URI:git@github.com:BigmonCL/bigmon-config-repo.git}
-          ignore-local-ssh-settings: ${GIT_IGNORE_LOCAL_SSH:false}
-          clone-on-start: ${GIT_CLONE_ON_START:false}
-          default-label: ${GIT_DEFAULT_BRANCH:main}
-          search-paths: ${GIT_SEARCH_PATHS:.}
-          private-key: ${GIT_PRIVATE_KEY}
-          timeout: ${GIT_TIMEOUT:5}
+          uri: ${SPRING_CLOUD_CONFIG_SERVER_GIT_URI:git@github.com:BigmonCL/bigmon-config-repo.git}
+          ignore-local-ssh-settings: ${SPRING_CLOUD_CONFIG_SERVER_GIT_IGNORE_LOCAL_SSH_SETTINGS:false}
+          clone-on-start: ${SPRING_CLOUD_CONFIG_SERVER_GIT_CLONE_ON_START:false}
+          default-label: ${SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL:main}
+          search-paths: ${SPRING_CLOUD_CONFIG_SERVER_GIT_SEARCH_PATHS:.}
+          timeout: ${SPRING_CLOUD_CONFIG_SERVER_GIT_TIMEOUT:5}
 
 management:
   endpoints:

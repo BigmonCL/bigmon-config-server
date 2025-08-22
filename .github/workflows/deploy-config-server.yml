@@ -78,11 +78,11 @@ jobs:
           
           # Crear archivo de configuración usando echo (evitar HEREDOC)
           echo "SPRING_PROFILES_ACTIVE=prod" > temp_env
-          echo "GIT_REPO_URI=git@github.com:BigmonCL/bigmon-config-repo.git" >> temp_env
-          echo "GIT_DEFAULT_BRANCH=main" >> temp_env
-          echo "GIT_IGNORE_LOCAL_SSH=false" >> temp_env
-          echo "GIT_CLONE_ON_START=false" >> temp_env
-          echo "GIT_TIMEOUT=5" >> temp_env
+          echo "SPRING_CLOUD_CONFIG_SERVER_GIT_URI=git@github.com:BigmonCL/bigmon-config-repo.git" >> temp_env
+          echo "SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL=main" >> temp_env
+          echo "SPRING_CLOUD_CONFIG_SERVER_GIT_IGNORE_LOCAL_SSH_SETTINGS=false" >> temp_env
+          echo "SPRING_CLOUD_CONFIG_SERVER_GIT_CLONE_ON_START=false" >> temp_env
+          echo "SPRING_CLOUD_CONFIG_SERVER_GIT_TIMEOUT=5" >> temp_env
           echo "JAVA_OPTS=-Xmx512m -Xms256m -XX:+UseG1GC -XX:MaxGCPauseMillis=100" >> temp_env
           
           # Subir configuración
@@ -95,6 +95,16 @@ jobs:
           
           # Escribir clave SSH
           echo "$GIT_PRIVATE_KEY" | ssh $SERVER_USER@$SERVER_IP "sudo tee /opt/bigmon-config-server/.ssh/id_rsa > /dev/null && sudo chmod 600 /opt/bigmon-config-server/.ssh/id_rsa && sudo chown bigmon-config:bigmon-config /opt/bigmon-config-server/.ssh/id_rsa"
+          
+          # Crear configuración SSH
+          echo "Host github.com" > temp_ssh_config
+          echo "    HostName github.com" >> temp_ssh_config
+          echo "    User git" >> temp_ssh_config
+          echo "    IdentityFile /opt/bigmon-config-server/.ssh/id_rsa" >> temp_ssh_config
+          echo "    StrictHostKeyChecking no" >> temp_ssh_config
+          scp temp_ssh_config $SERVER_USER@$SERVER_IP:/tmp/ssh_config
+          ssh $SERVER_USER@$SERVER_IP "sudo mv /tmp/ssh_config /opt/bigmon-config-server/.ssh/config && sudo chown bigmon-config:bigmon-config /opt/bigmon-config-server/.ssh/config && sudo chmod 600 /opt/bigmon-config-server/.ssh/config"
+          rm temp_ssh_config
 
       - name: Setup systemd service
         env:
@@ -115,6 +125,7 @@ jobs:
           echo "WorkingDirectory=/opt/bigmon-config-server" >> temp_service
           echo "ExecStart=/usr/bin/java -jar /opt/bigmon-config-server/bigmon-config-server.jar" >> temp_service
           echo "EnvironmentFile=/opt/bigmon-config-server/config/application.env" >> temp_service
+          echo "Environment=HOME=/opt/bigmon-config-server" >> temp_service
           echo "Restart=always" >> temp_service
           echo "RestartSec=10" >> temp_service
           echo "" >> temp_service
