@@ -73,6 +73,9 @@ jobs:
         run: |
           echo "⚙️ Configurando variables de entorno..."
           
+          # Crear usuario si no existe
+          ssh $SERVER_USER@$SERVER_IP "id bigmon-config >/dev/null 2>&1 || sudo useradd --system --home-dir /opt/bigmon-config-server --shell /bin/false bigmon-config"
+          
           # Crear archivo de configuración usando echo (evitar HEREDOC)
           echo "SPRING_PROFILES_ACTIVE=prod" > temp_env
           echo "GIT_REPO_URI=git@github.com:BigmonCL/bigmon-config-repo.git" >> temp_env
@@ -92,6 +95,37 @@ jobs:
           
           # Escribir clave SSH
           echo "$GIT_PRIVATE_KEY" | ssh $SERVER_USER@$SERVER_IP "sudo tee /opt/bigmon-config-server/.ssh/id_rsa > /dev/null && sudo chmod 600 /opt/bigmon-config-server/.ssh/id_rsa && sudo chown bigmon-config:bigmon-config /opt/bigmon-config-server/.ssh/id_rsa"
+
+      - name: Setup systemd service
+        env:
+          SERVER_IP: ${{ secrets.BIGMON_PROD_SERVER_IP }}
+          SERVER_USER: ${{ secrets.BIGMON_PROD_SERVER_USER }}
+        run: |
+          echo "🔧 Configurando servicio systemd..."
+          
+          # Crear servicio systemd si no existe
+          ssh $SERVER_USER@$SERVER_IP "if [ ! -f /etc/systemd/system/bigmon-config-server.service ]; then
+            sudo tee /etc/systemd/system/bigmon-config-server.service > /dev/null <<'SERVICE_EOF'
+[Unit]
+Description=Bigmon Config Server
+After=network.target
+
+[Service]
+Type=exec
+User=bigmon-config
+Group=bigmon-config
+WorkingDirectory=/opt/bigmon-config-server
+ExecStart=/usr/bin/java -jar /opt/bigmon-config-server/bigmon-config-server.jar
+EnvironmentFile=/opt/bigmon-config-server/config/application.env
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+SERVICE_EOF
+            sudo systemctl daemon-reload
+            sudo systemctl enable bigmon-config-server
+          fi"
 
       - name: Restart service
         env:
