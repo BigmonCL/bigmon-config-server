@@ -1,0 +1,64 @@
+name: Deploy Config Server to Production
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Build Config Server
+        run: mvn clean install -DskipTests
+
+      - name: Upload JAR to server
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY_BIGMON }}
+          SERVER_IP: ${{ secrets.BIGMON_PROD_SERVER_IP }}
+          SERVER_USER: ${{ secrets.BIGMON_PROD_SERVER_USER }}
+        run: |
+          echo "$SSH_PRIVATE_KEY" > key.pem
+          chmod 600 key.pem
+
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          BACKUP_DIR="/opt/bigmon-config-server/backups"
+          DEPLOY_DIR="/opt/bigmon-config-server"
+
+          TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+          ssh -i key.pem -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP <<EOF
+            mkdir -p $BACKUP_DIR
+            if [ -f $DEPLOY_DIR/bigmon-config-server.jar ]; then
+              cp $DEPLOY_DIR/bigmon-config-server.jar $BACKUP_DIR/bigmon-config-server-\$VERSION-\$TIMESTAMP.jar
+            fi
+          EOF
+
+          scp -i key.pem -o StrictHostKeyChecking=no \
+            target/bigmon-config-server-*.jar \
+            $SERVER_USER@$SERVER_IP:$DEPLOY_DIR/bigmon-config-server.jar
+
+      - name: Restart service on server
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY_BIGMON }}
+          SERVER_IP: ${{ secrets.BIGMON_PROD_SERVER_IP }}
+          SERVER_USER: ${{ secrets.BIGMON_PROD_SERVER_USER }}
+        run: |
+          echo "$SSH_PRIVATE_KEY" > key.pem
+          chmod 600 key.pem
+          ssh -i key.pem -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP <<EOF
+            sudo systemctl daemon-reexec
+            sudo systemctl restart bigmon-config-server
+            sudo systemctl status bigmon-config-server --no-pager
+          EOF

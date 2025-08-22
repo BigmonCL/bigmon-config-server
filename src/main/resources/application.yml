@@ -1,0 +1,23 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+
+  cloud:
+    config:
+      server:
+        git:
+          uri: git@github.com:BigmonCL/bigmon-config-repo.git
+          ignore-local-ssh-settings: true
+          clone-on-start: true     # Cambiar a false en producción si no lo necesitas
+          default-label: main
+          search-paths: .
+          private-key: ${CONFIG_GIT_PRIVATE_KEY}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
