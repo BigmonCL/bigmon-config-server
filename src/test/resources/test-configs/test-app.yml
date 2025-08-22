@@ -1,0 +1,10 @@
+# Configuración de test para aplicación de ejemplo
+test:
+  property: "test-value"
+  
+server:
+  port: 8080
+
+spring:
+  application:
+    name: test-application

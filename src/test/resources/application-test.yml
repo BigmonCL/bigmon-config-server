@@ -1,0 +1,29 @@
+# Configuración para tests
+spring:
+  application:
+    name: config-server-test
+
+  cloud:
+    config:
+      server:
+        # Usar configuración nativa para tests (sin Git)
+        native:
+          search-locations: classpath:/test-configs/
+        git:
+          # Desactivar Git completamente en tests
+          uri: ""
+
+# Configuración de logging para tests
+logging:
+  level:
+    org.springframework.cloud.config: WARN
+    org.eclipse.jgit: ERROR
+    com.bigmon.configserver: DEBUG
+
+# Desactivar actuator para tests simples
+management:
+  endpoints:
+    enabled-by-default: false
+  endpoint:
+    health:
+      enabled: true
