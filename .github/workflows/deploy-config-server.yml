@@ -118,16 +118,14 @@ jobs:
         run: |
           echo "⚙️ Configurando variables de entorno..."
           
-          # Crear archivo de configuración
-          cat > temp_env << 'EOF'
-SPRING_PROFILES_ACTIVE=prod
-GIT_REPO_URI=git@github.com:BigmonCL/bigmon-config-repo.git
-GIT_DEFAULT_BRANCH=main
-GIT_IGNORE_LOCAL_SSH=false
-GIT_CLONE_ON_START=false
-GIT_TIMEOUT=5
-JAVA_OPTS=-Xmx512m -Xms256m -XX:+UseG1GC -XX:MaxGCPauseMillis=100
-EOF
+          # Crear archivo de configuración usando echo (evitar HEREDOC)
+          echo "SPRING_PROFILES_ACTIVE=prod" > temp_env
+          echo "GIT_REPO_URI=git@github.com:BigmonCL/bigmon-config-repo.git" >> temp_env
+          echo "GIT_DEFAULT_BRANCH=main" >> temp_env
+          echo "GIT_IGNORE_LOCAL_SSH=false" >> temp_env
+          echo "GIT_CLONE_ON_START=false" >> temp_env
+          echo "GIT_TIMEOUT=5" >> temp_env
+          echo "JAVA_OPTS=-Xmx512m -Xms256m -XX:+UseG1GC -XX:MaxGCPauseMillis=100" >> temp_env
           
           # Subir configuración
           scp temp_env $SERVER_USER@$SERVER_IP:/tmp/application.env
