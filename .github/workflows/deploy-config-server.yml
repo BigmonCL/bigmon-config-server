@@ -88,49 +88,38 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.BIGMON_PROD_SERVER_IP }} >> ~/.ssh/known_hosts
 
-      - name: Deploy application
+      - name: Create deployment directories
+        env:
+          SERVER_IP: ${{ secrets.BIGMON_PROD_SERVER_IP }}
+          SERVER_USER: ${{ secrets.BIGMON_PROD_SERVER_USER }}
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+          
+          echo "🚀 Iniciando despliegue de Config Server v$VERSION"
+          
+          # Preparar directorios y backup
+          ssh $SERVER_USER@$SERVER_IP "sudo mkdir -p /opt/bigmon-config-server/backups /opt/bigmon-config-server/config"
+          ssh $SERVER_USER@$SERVER_IP "if [ -f /opt/bigmon-config-server/bigmon-config-server.jar ]; then sudo cp /opt/bigmon-config-server/bigmon-config-server.jar /opt/bigmon-config-server/backups/bigmon-config-server-backup-$TIMESTAMP.jar; fi"
+
+      - name: Upload JAR file
+        env:
+          SERVER_IP: ${{ secrets.BIGMON_PROD_SERVER_IP }}
+          SERVER_USER: ${{ secrets.BIGMON_PROD_SERVER_USER }}
+        run: |
+          echo "📤 Subiendo nuevo JAR..."
+          scp target/bigmon-config-server-*.jar $SERVER_USER@$SERVER_IP:/opt/bigmon-config-server/bigmon-config-server.jar
+
+      - name: Configure environment
         env:
           SERVER_IP: ${{ secrets.BIGMON_PROD_SERVER_IP }}
           SERVER_USER: ${{ secrets.BIGMON_PROD_SERVER_USER }}
           GIT_PRIVATE_KEY: ${{ secrets.GIT_PRIVATE_KEY }}
         run: |
-          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          BACKUP_DIR="/opt/bigmon-config-server/backups"
-          DEPLOY_DIR="/opt/bigmon-config-server"
-          SERVICE_NAME="bigmon-config-server"
+          echo "⚙️ Configurando variables de entorno..."
           
-          TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
-          
-          echo "🚀 Iniciando despliegue de Config Server v$VERSION"
-          
-          # Crear estructura de directorios y hacer backup
-          ssh $SERVER_USER@$SERVER_IP <<EOF
-            echo "📁 Preparando directorios..."
-            sudo mkdir -p $BACKUP_DIR $DEPLOY_DIR/config
-            
-            # Backup del JAR actual
-            if [ -f $DEPLOY_DIR/bigmon-config-server.jar ]; then
-              echo "💾 Creando backup..."
-              sudo cp $DEPLOY_DIR/bigmon-config-server.jar $BACKUP_DIR/bigmon-config-server-backup-$TIMESTAMP.jar
-            fi
-            
-            # Verificar que el servicio existe
-            if ! systemctl list-unit-files | grep -q $SERVICE_NAME; then
-              echo "❌ Servicio $SERVICE_NAME no encontrado"
-              exit 1
-            fi
-          EOF
-          
-          # Subir nuevo JAR
-          echo "📤 Subiendo nuevo JAR..."
-          scp target/bigmon-config-server-*.jar $SERVER_USER@$SERVER_IP:$DEPLOY_DIR/bigmon-config-server.jar
-          
-          # Configurar variables de entorno en el servidor
-          ssh $SERVER_USER@$SERVER_IP << 'REMOTE_SCRIPT'
-            echo "⚙️ Configurando variables de entorno..."
-            
-            # Crear archivo de configuración de entorno
-            sudo tee /opt/bigmon-config-server/config/application.env > /dev/null << 'ENVEOF'
+          # Crear archivo de configuración
+          cat > temp_env << 'EOF'
 SPRING_PROFILES_ACTIVE=prod
 GIT_REPO_URI=git@github.com:BigmonCL/bigmon-config-repo.git
 GIT_DEFAULT_BRANCH=main
@@ -138,50 +127,42 @@ GIT_IGNORE_LOCAL_SSH=false
 GIT_CLONE_ON_START=false
 GIT_TIMEOUT=5
 JAVA_OPTS=-Xmx512m -Xms256m -XX:+UseG1GC -XX:MaxGCPauseMillis=100
-ENVEOF
-          REMOTE_SCRIPT
+EOF
           
-          # Configurar clave SSH por separado
-          ssh $SERVER_USER@$SERVER_IP << 'SSH_SETUP'
-            # Crear clave SSH si no existe
-            if [ ! -f /opt/bigmon-config-server/.ssh/id_rsa ]; then
-              echo "🔑 Configurando clave SSH..."
-              sudo mkdir -p /opt/bigmon-config-server/.ssh
-              sudo chown -R bigmon-config:bigmon-config /opt/bigmon-config-server/.ssh
-              sudo chmod 700 /opt/bigmon-config-server/.ssh
-            fi
-          SSH_SETUP
+          # Subir configuración
+          scp temp_env $SERVER_USER@$SERVER_IP:/tmp/application.env
+          ssh $SERVER_USER@$SERVER_IP "sudo mv /tmp/application.env /opt/bigmon-config-server/config/application.env && sudo chown bigmon-config:bigmon-config /opt/bigmon-config-server/config/application.env && sudo chmod 640 /opt/bigmon-config-server/config/application.env"
+          rm temp_env
+          
+          # Configurar SSH
+          ssh $SERVER_USER@$SERVER_IP "sudo mkdir -p /opt/bigmon-config-server/.ssh && sudo chown -R bigmon-config:bigmon-config /opt/bigmon-config-server/.ssh && sudo chmod 700 /opt/bigmon-config-server/.ssh"
           
           # Escribir clave SSH
-          echo "$GIT_PRIVATE_KEY" | ssh $SERVER_USER@$SERVER_IP 'sudo tee /opt/bigmon-config-server/.ssh/id_rsa > /dev/null && sudo chmod 600 /opt/bigmon-config-server/.ssh/id_rsa && sudo chown bigmon-config:bigmon-config /opt/bigmon-config-server/.ssh/id_rsa'
+          echo "$GIT_PRIVATE_KEY" | ssh $SERVER_USER@$SERVER_IP "sudo tee /opt/bigmon-config-server/.ssh/id_rsa > /dev/null && sudo chmod 600 /opt/bigmon-config-server/.ssh/id_rsa && sudo chown bigmon-config:bigmon-config /opt/bigmon-config-server/.ssh/id_rsa"
 
-      - name: Restart and verify service
+      - name: Restart service
         env:
           SERVER_IP: ${{ secrets.BIGMON_PROD_SERVER_IP }}
           SERVER_USER: ${{ secrets.BIGMON_PROD_SERVER_USER }}
         run: |
-          SERVICE_NAME="bigmon-config-server"
+          echo "🔄 Reiniciando servicio..."
+          ssh $SERVER_USER@$SERVER_IP "sudo systemctl daemon-reload"
+          ssh $SERVER_USER@$SERVER_IP "sudo systemctl restart bigmon-config-server"
           
-          ssh $SERVER_USER@$SERVER_IP << 'SERVICE_RESTART'
-            echo "🔄 Reiniciando servicio..."
-            sudo systemctl daemon-reload
-            sudo systemctl restart bigmon-config-server
-            
-            # Esperar que el servicio esté activo
-            echo "⏳ Esperando que el servicio esté listo..."
-            for i in {1..30}; do
-              if sudo systemctl is-active --quiet bigmon-config-server; then
-                echo "✅ Servicio activo"
-                break
-              fi
-              echo "   Intento $i/30..."
-              sleep 2
-            done
-            
-            # Verificar estado del servicio
-            echo "📊 Estado del servicio:"
-            sudo systemctl status bigmon-config-server --no-pager -l
-          SERVICE_RESTART
+          # Esperar que el servicio esté activo
+          echo "⏳ Esperando que el servicio esté listo..."
+          for i in {1..30}; do
+            if ssh $SERVER_USER@$SERVER_IP "sudo systemctl is-active --quiet bigmon-config-server"; then
+              echo "✅ Servicio activo"
+              break
+            fi
+            echo "   Intento $i/30..."
+            sleep 2
+          done
+          
+          # Verificar estado del servicio
+          echo "📊 Estado del servicio:"
+          ssh $SERVER_USER@$SERVER_IP "sudo systemctl status bigmon-config-server --no-pager -l"
 
       - name: Health check
         env:
@@ -190,22 +171,19 @@ ENVEOF
         run: |
           echo "🏥 Ejecutando health check..."
           
-          ssh $SERVER_USER@$SERVER_IP << 'HEALTH_CHECK'
-            # Esperar que la aplicación esté disponible
-            for i in {1..20}; do
-              if curl -f http://localhost:8888/actuator/health >/dev/null 2>&1; then
-                echo "✅ Health check exitoso"
-                curl -s http://localhost:8888/actuator/health | jq '.' 2>/dev/null || curl -s http://localhost:8888/actuator/health
-                exit 0
-              fi
-              echo "   Health check intento $i/20..."
-              sleep 10
-            done
-            
-            echo "❌ Health check falló"
-            echo "📋 Logs del servicio:"
-            sudo journalctl -u bigmon-config-server --no-pager -n 50
-            exit 1
-          HEALTH_CHECK
+          # Esperar que la aplicación esté disponible
+          for i in {1..20}; do
+            if ssh $SERVER_USER@$SERVER_IP "curl -f http://localhost:8888/actuator/health >/dev/null 2>&1"; then
+              echo "✅ Health check exitoso"
+              ssh $SERVER_USER@$SERVER_IP "curl -s http://localhost:8888/actuator/health"
+              echo "🎉 Despliegue completado exitosamente"
+              exit 0
+            fi
+            echo "   Health check intento $i/20..."
+            sleep 10
+          done
           
-          echo "🎉 Despliegue completado exitosamente"
+          echo "❌ Health check falló"
+          echo "📋 Logs del servicio:"
+          ssh $SERVER_USER@$SERVER_IP "sudo journalctl -u bigmon-config-server --no-pager -n 50"
+          exit 1
