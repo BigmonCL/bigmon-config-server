@@ -103,29 +103,29 @@ jobs:
         run: |
           echo "🔧 Configurando servicio systemd..."
           
-          # Crear servicio systemd si no existe
-          ssh $SERVER_USER@$SERVER_IP "if [ ! -f /etc/systemd/system/bigmon-config-server.service ]; then
-            sudo tee /etc/systemd/system/bigmon-config-server.service > /dev/null <<'SERVICE_EOF'
-[Unit]
-Description=Bigmon Config Server
-After=network.target
-
-[Service]
-Type=exec
-User=bigmon-config
-Group=bigmon-config
-WorkingDirectory=/opt/bigmon-config-server
-ExecStart=/usr/bin/java -jar /opt/bigmon-config-server/bigmon-config-server.jar
-EnvironmentFile=/opt/bigmon-config-server/config/application.env
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-SERVICE_EOF
-            sudo systemctl daemon-reload
-            sudo systemctl enable bigmon-config-server
-          fi"
+          # Crear archivo del servicio systemd
+          echo "[Unit]" > temp_service
+          echo "Description=Bigmon Config Server" >> temp_service
+          echo "After=network.target" >> temp_service
+          echo "" >> temp_service
+          echo "[Service]" >> temp_service
+          echo "Type=exec" >> temp_service
+          echo "User=bigmon-config" >> temp_service
+          echo "Group=bigmon-config" >> temp_service
+          echo "WorkingDirectory=/opt/bigmon-config-server" >> temp_service
+          echo "ExecStart=/usr/bin/java -jar /opt/bigmon-config-server/bigmon-config-server.jar" >> temp_service
+          echo "EnvironmentFile=/opt/bigmon-config-server/config/application.env" >> temp_service
+          echo "Restart=always" >> temp_service
+          echo "RestartSec=10" >> temp_service
+          echo "" >> temp_service
+          echo "[Install]" >> temp_service
+          echo "WantedBy=multi-user.target" >> temp_service
+          
+          # Subir y configurar servicio si no existe
+          ssh $SERVER_USER@$SERVER_IP "if [ ! -f /etc/systemd/system/bigmon-config-server.service ]; then echo 'Creando servicio systemd...'; fi"
+          scp temp_service $SERVER_USER@$SERVER_IP:/tmp/bigmon-config-server.service
+          ssh $SERVER_USER@$SERVER_IP "if [ ! -f /etc/systemd/system/bigmon-config-server.service ]; then sudo mv /tmp/bigmon-config-server.service /etc/systemd/system/bigmon-config-server.service && sudo systemctl daemon-reload && sudo systemctl enable bigmon-config-server; else rm /tmp/bigmon-config-server.service; fi"
+          rm temp_service
 
       - name: Restart service
         env:
