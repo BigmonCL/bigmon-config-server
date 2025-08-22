@@ -36,3 +36,14 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### Application ###
+.env
+*.log
+nohup.out
+app.pid
+
+### SSH Keys ###
+*.pem
+id_rsa*
+*.key

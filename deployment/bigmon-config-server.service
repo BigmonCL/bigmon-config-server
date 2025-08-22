@@ -1,0 +1,67 @@
+[Unit]
+Description=Bigmon Config Server - Spring Cloud Config Server
+Documentation=https://github.com/BigmonCL/bigmon-config-server
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=bigmon-config
+Group=bigmon-config
+WorkingDirectory=/opt/bigmon-config-server
+
+# Comando de ejecución
+ExecStart=/usr/bin/java $JAVA_OPTS -jar /opt/bigmon-config-server/bigmon-config-server.jar
+
+# Variables de entorno
+EnvironmentFile=/opt/bigmon-config-server/config/application.env
+
+# Configuración de reinicio
+Restart=always
+RestartSec=10
+StartLimitInterval=5min
+StartLimitBurst=10
+
+# Configuración de seguridad
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/bigmon-config-server/logs /tmp
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+
+# Configuración de red (solo si es necesario)
+IPAccounting=yes
+IPAddressAllow=localhost
+IPAddressAllow=10.0.0.0/8
+IPAddressAllow=172.16.0.0/12
+IPAddressAllow=192.168.0.0/16
+
+# Configuración SSH para acceso Git
+Environment=HOME=/opt/bigmon-config-server
+Environment=SSH_AUTH_SOCK=
+
+# Configuración de logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bigmon-config-server
+
+# Configuración de recursos
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryMax=1G
+TasksMax=2048
+
+# Health check (systemd 240+)
+ExecStartPost=/bin/bash -c 'sleep 30; curl -f http://localhost:8888/actuator/health || exit 1'
+
+# Graceful shutdown
+TimeoutStopSec=30
+KillMode=mixed
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target
+Alias=config-server.service

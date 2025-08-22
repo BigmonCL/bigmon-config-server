@@ -9,15 +9,28 @@ spring:
     config:
       server:
         git:
-          uri: git@github.com:BigmonCL/bigmon-config-repo.git
-          ignore-local-ssh-settings: true
-          clone-on-start: true     # Cambiar a false en producción si no lo necesitas
-          default-label: main
-          search-paths: .
-          private-key: ${CONFIG_GIT_PRIVATE_KEY}
+          uri: ${GIT_REPO_URI:git@github.com:BigmonCL/bigmon-config-repo.git}
+          ignore-local-ssh-settings: ${GIT_IGNORE_LOCAL_SSH:false}
+          clone-on-start: ${GIT_CLONE_ON_START:false}
+          default-label: ${GIT_DEFAULT_BRANCH:main}
+          search-paths: ${GIT_SEARCH_PATHS:.}
+          private-key: ${GIT_PRIVATE_KEY}
+          timeout: ${GIT_TIMEOUT:5}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health, info
+        include: health, info, refresh, env
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  health:
+    defaults:
+      enabled: true
+    diskspace:
+      enabled: true
+    ping:
+      enabled: true

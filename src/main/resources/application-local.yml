@@ -1,0 +1,28 @@
+# Configuración para desarrollo local (sin Git)
+# Útil para testing sin conectividad Git
+spring:
+  cloud:
+    config:
+      server:
+        # Configuración nativa para desarrollo local
+        native:
+          search-locations: classpath:/configs/
+        # Desactiva Git temporalmente
+        git:
+          uri: ${GIT_REPO_URI:}
+          clone-on-start: false
+          skip-ssl-validation: true
+
+# Para desarrollo local sin Git
+---
+spring:
+  config:
+    activate:
+      on-profile: local-no-git
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: classpath:/configs/
+        git:
+          uri: ""  # Desactiva completamente Git

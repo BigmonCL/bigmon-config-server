@@ -1,0 +1,54 @@
+# Configuración para producción
+spring:
+  cloud:
+    config:
+      server:
+        git:
+          clone-on-start: false  # En producción, no clona al inicio para arranque más rápido
+          ignore-local-ssh-settings: false  # Usa la configuración SSH del sistema
+          timeout: 5  # Timeout más estricto en producción
+          force-pull: true  # Fuerza pull en cada request
+
+# Configuración más estricta para producción
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, refresh, metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: always
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+    defaults:
+      enabled: true
+    diskspace:
+      enabled: true
+      threshold: 1GB
+  metrics:
+    export:
+      simple:
+        enabled: true
+
+# Logging más conservador en producción
+logging:
+  level:
+    org.springframework.cloud.config: INFO
+    org.eclipse.jgit: WARN
+    com.bigmon.configserver: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    path: /opt/bigmon-config-server/logs/
+    name: bigmon-config-server.log
+  logback:
+    rollingpolicy:
+      max-file-size: 100MB
+      max-history: 30
+      total-size-cap: 3GB

@@ -1,0 +1,14 @@
+# Configuración para desarrollo
+spring:
+  cloud:
+    config:
+      server:
+        git:
+          clone-on-start: true  # En desarrollo, clona al inicio para validar conectividad
+          ignore-local-ssh-settings: true  # Usa la configuración SSH embebida
+          timeout: 10  # Mayor timeout en desarrollo para debugging
+
+logging:
+  level:
+    org.springframework.cloud.config: DEBUG
+    org.eclipse.jgit: INFO
